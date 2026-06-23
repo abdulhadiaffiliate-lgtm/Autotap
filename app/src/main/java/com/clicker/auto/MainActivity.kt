@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             // Minimize app, show crosshair picker overlay
             val intent = Intent(this, OverlayService::class.java)
             intent.action = OverlayService.ACTION_PICK_POINT
-            startService(intent)
+            startForegroundService(intent)
             moveTaskToBack(true)
         }
 
@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity() {
             putExtra(OverlayService.EXTRA_X, tapX)
             putExtra(OverlayService.EXTRA_Y, tapY)
         }
-        startService(intent)
+        startForegroundService(intent)
 
         binding.btnStartStop.text = getString(R.string.btn_stop)
         binding.btnStartStop.setBackgroundResource(R.drawable.bg_btn_danger)
@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
     private fun stopTapping() {
         val intent = Intent(this, OverlayService::class.java)
         intent.action = OverlayService.ACTION_STOP
-        startService(intent)
+        startForegroundService(intent)
 
         binding.btnStartStop.text = getString(R.string.btn_start)
         binding.btnStartStop.setBackgroundResource(R.drawable.bg_btn_primary)
