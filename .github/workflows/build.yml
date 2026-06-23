@@ -17,14 +17,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Regenerate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v3
-
       - name: Install Gradle and regenerate wrapper
         run: |
           curl -s https://get.sdkman.io | bash
           source "$HOME/.sdkman/bin/sdkman-init.sh"
-          sdk install gradle 8.7
+          sdk install gradle 8.7 < /dev/null
           gradle wrapper --gradle-version 8.7
 
       - name: Grant execute permission for gradlew
