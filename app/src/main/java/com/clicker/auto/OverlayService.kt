@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -28,11 +29,14 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d("AutoTapperDebug", "OverlayService onCreate() called")
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForegroundNotification()
+        Log.d("AutoTapperDebug", "OverlayService foreground notification started")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("AutoTapperDebug", "onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_START -> {
                 val interval = intent.getLongExtra(EXTRA_INTERVAL, 100L)
@@ -64,6 +68,7 @@ class OverlayService : Service() {
     }
 
     private fun showBubble() {
+        Log.d("AutoTapperDebug", "showBubble() called, bubbleView currently null=${bubbleView == null}")
         if (bubbleView != null) {
             updateBubbleIcon()
             return
@@ -72,6 +77,7 @@ class OverlayService : Service() {
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.overlay_bubble, null)
         bubbleView = view
+        Log.d("AutoTapperDebug", "bubble view inflated successfully")
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -120,7 +126,12 @@ class OverlayService : Service() {
             }
         }
 
-        windowManager.addView(view, params)
+        try {
+            windowManager.addView(view, params)
+            Log.d("AutoTapperDebug", "bubble addView SUCCESS")
+        } catch (e: Exception) {
+            Log.e("AutoTapperDebug", "bubble addView FAILED: ${e.javaClass.simpleName}: ${e.message}", e)
+        }
         updateBubbleIcon()
     }
 
@@ -239,10 +250,15 @@ class OverlayService : Service() {
             .setOngoing(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(1, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(1, notification)
+            }
+            Log.d("AutoTapperDebug", "startForeground SUCCESS")
+        } catch (e: Exception) {
+            Log.e("AutoTapperDebug", "startForeground FAILED: ${e.javaClass.simpleName}: ${e.message}", e)
         }
     }
 
