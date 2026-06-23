@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoTapper</string>
+    <string name="accessibility_service_description">Allows AutoTapper to perform automated taps at the locations and speed you configure. No data is collected or transmitted.</string>
+
+    <string name="title_settings">Tap Settings</string>
+    <string name="label_interval">Interval (ms)</string>
+    <string name="label_speed">Taps per second</string>
+    <string name="label_jitter">Random jitter</string>
+    <string name="label_tap_count">Tap limit</string>
+    <string name="label_infinite">Infinite</string>
+    <string name="btn_set_point">Set Tap Point</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_enable_service">Enable Accessibility Service</string>
+    <string name="btn_enable_overlay">Allow Overlay Permission</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_running">Running…</string>
+    <string name="status_service_off">Accessibility service disabled</string>
+    <string name="status_overlay_off">Overlay permission needed</string>
+</resources>
