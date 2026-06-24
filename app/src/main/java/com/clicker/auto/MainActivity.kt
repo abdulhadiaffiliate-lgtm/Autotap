@@ -103,6 +103,11 @@ class MainActivity : AppCompatActivity() {
             putExtra(OverlayService.EXTRA_Y, tapY)
         }
         startForegroundService(intent)
+<<<<<<< HEAD
+=======
+
+        binding.btnStartStop.text = getString(R.string.btn_stop)
+>>>>>>> 7302e44bd839687290440e53302d44dc5a6855df
         binding.btnStartStop.setBackgroundResource(R.drawable.bg_btn_danger)
         binding.tvStatus.text = getString(R.string.status_running)
 
