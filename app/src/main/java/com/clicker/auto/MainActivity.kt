@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupListeners()
+        setupBottomNav()
         refreshStatus()
     }
 
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity() {
             // Minimize app, show crosshair picker overlay
             val intent = Intent(this, OverlayService::class.java)
             intent.action = OverlayService.ACTION_PICK_POINT
-            startService(intent)
+            startForegroundService(intent)
             moveTaskToBack(true)
         }
 
@@ -101,9 +102,7 @@ class MainActivity : AppCompatActivity() {
             putExtra(OverlayService.EXTRA_X, tapX)
             putExtra(OverlayService.EXTRA_Y, tapY)
         }
-        startService(intent)
-
-        binding.btnStartStop.text = getString(R.string.btn_stop)
+        startForegroundService(intent)
         binding.btnStartStop.setBackgroundResource(R.drawable.bg_btn_danger)
         binding.tvStatus.text = getString(R.string.status_running)
 
@@ -113,11 +112,27 @@ class MainActivity : AppCompatActivity() {
     private fun stopTapping() {
         val intent = Intent(this, OverlayService::class.java)
         intent.action = OverlayService.ACTION_STOP
-        startService(intent)
+        startForegroundService(intent)
 
         binding.btnStartStop.text = getString(R.string.btn_start)
         binding.btnStartStop.setBackgroundResource(R.drawable.bg_btn_primary)
         binding.tvStatus.text = getString(R.string.status_ready)
+    }
+
+    private fun setupBottomNav() {
+        binding.navHome.setOnClickListener { /* already here */ }
+        binding.navCps.setOnClickListener {
+            startActivity(Intent(this, CpsTestActivity::class.java))
+        }
+        binding.navStats.setOnClickListener {
+            startActivity(Intent(this, StatsActivity::class.java))
+        }
+        binding.navCustomize.setOnClickListener {
+            startActivity(Intent(this, CustomizeActivity::class.java))
+        }
+        binding.navFaq.setOnClickListener {
+            startActivity(Intent(this, FaqActivity::class.java))
+        }
     }
 
     private fun refreshStatus() {

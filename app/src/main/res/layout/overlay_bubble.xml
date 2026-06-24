@@ -1,21 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="60dp"
-    android:layout_height="60dp">
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
-    <View
+    <!-- Close button: always stops tapping and removes overlay entirely -->
+    <FrameLayout
+        android:id="@+id/btnBubbleClose"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="6dp">
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_bubble_small" />
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="@color/white" />
+    </FrameLayout>
+
+    <!-- Main play/pause toggle bubble -->
+    <FrameLayout
+        android:id="@+id/btnBubbleMain"
         android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:background="@drawable/bg_bubble" />
+        android:layout_height="60dp">
+        <View
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="@drawable/bg_bubble" />
+        <ImageView
+            android:id="@+id/ivBubbleIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@android:drawable/ic_media_play"
+            app:tint="@color/white" />
+    </FrameLayout>
 
-    <ImageView
-        android:id="@+id/ivBubbleIcon"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_gravity="center"
-        android:contentDescription="@null"
-        android:src="@android:drawable/ic_media_play"
-        app:tint="@color/white" />
+    <!-- Settings button: brings app back to foreground -->
+    <FrameLayout
+        android:id="@+id/btnBubbleSettings"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="6dp">
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_bubble_small" />
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@android:drawable/ic_menu_manage"
+            app:tint="@color/white" />
+    </FrameLayout>
 
-</FrameLayout>
+</LinearLayout>
+

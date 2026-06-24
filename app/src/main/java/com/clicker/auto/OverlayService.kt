@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -26,13 +27,30 @@ class OverlayService : Service() {
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var isRunning = false
 
+    // Bubble's last known on-screen bounds, used to keep the tap point away from it.
+    private var bubbleLeft = 0
+    private var bubbleTop = 0
+    private var bubbleRight = 0
+    private var bubbleBottom = 0
+    private val bubbleSafeMargin = 140 // px buffer around the bubble that taps must avoid
+
     override fun onCreate() {
         super.onCreate()
+        Log.d("AutoTapperDebug", "OverlayService onCreate() called")
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForegroundNotification()
+        StatsStore.recordSessionStart(this)
+        instanceRef = this
+    }
+
+    /** Called by TapAccessibilityService if the hard safety cap is hit. */
+    fun onSafetyStop() {
+        isRunning = false
+        updateBubbleIcon()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("AutoTapperDebug", "onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_START -> {
                 val interval = intent.getLongExtra(EXTRA_INTERVAL, 100L)
@@ -47,14 +65,18 @@ class OverlayService : Service() {
                     y = metrics.heightPixels / 2
                 }
 
-                TapAccessibilityService.instance?.startTapping(x, y, interval, jitter, count)
+                // Safety: never allow the tap point to land on the bubble itself.
+                // If it would, nudge it away so the app can't tap-lock its own controls.
+                val safeXY = pushPointAwayFromBubble(x, y)
+
+                TapAccessibilityService.instance?.startTapping(
+                    safeXY.first, safeXY.second, interval, jitter, count
+                )
                 isRunning = true
                 showBubble()
             }
             ACTION_STOP -> {
-                TapAccessibilityService.instance?.stopTapping()
-                isRunning = false
-                updateBubbleIcon()
+                stopAllTapping()
             }
             ACTION_PICK_POINT -> {
                 showCrosshairPicker()
@@ -63,7 +85,39 @@ class OverlayService : Service() {
         return START_NOT_STICKY
     }
 
+    private fun stopAllTapping() {
+        TapAccessibilityService.instance?.stopTapping()
+        isRunning = false
+        updateBubbleIcon()
+    }
+
+    /**
+     * If (x, y) falls inside the bubble's bounds (plus a safety margin), move it
+     * to the opposite side of the screen so the auto-tap can never re-trigger
+     * the bubble's own controls and cause a runaway loop.
+     */
+    private fun pushPointAwayFromBubble(x: Int, y: Int): Pair<Int, Int> {
+        if (bubbleRight == 0 && bubbleBottom == 0) return Pair(x, y) // bubble not placed yet
+
+        val insideDangerZone =
+            x in (bubbleLeft - bubbleSafeMargin)..(bubbleRight + bubbleSafeMargin) &&
+            y in (bubbleTop - bubbleSafeMargin)..(bubbleBottom + bubbleSafeMargin)
+
+        if (!insideDangerZone) return Pair(x, y)
+
+        val metrics = resources.displayMetrics
+        // Push to the vertical center of the opposite half of the screen from the bubble.
+        val newY = if (bubbleTop < metrics.heightPixels / 2) {
+            (metrics.heightPixels * 3) / 4
+        } else {
+            metrics.heightPixels / 4
+        }
+        Log.d("AutoTapperDebug", "Tap point was inside bubble safe-zone, relocated to ($x, $newY)")
+        return Pair(x, newY)
+    }
+
     private fun showBubble() {
+        Log.d("AutoTapperDebug", "showBubble() called, bubbleView currently null=${bubbleView == null}")
         if (bubbleView != null) {
             updateBubbleIcon()
             return
@@ -84,6 +138,7 @@ class OverlayService : Service() {
         params.x = 0
         params.y = 200
         bubbleParams = params
+        updateBubbleBounds(view, params)
 
         var lastTouchX = 0f
         var lastTouchY = 0f
@@ -91,7 +146,9 @@ class OverlayService : Service() {
         var lastParamY = 0
         var moved = false
 
-        view.setOnTouchListener { v, event ->
+        // Dragging is handled on the root container so it works no matter which
+        // child (close/main/settings) the finger started on, as long as it moves.
+        view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     lastTouchX = event.rawX
@@ -99,41 +156,120 @@ class OverlayService : Service() {
                     lastParamX = params.x
                     lastParamY = params.y
                     moved = false
-                    true
+                    false // let child views still receive click events
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - lastTouchX).toInt()
                     val dy = (event.rawY - lastTouchY).toInt()
-                    if (kotlin.math.abs(dx) > 5 || kotlin.math.abs(dy) > 5) moved = true
-                    params.x = lastParamX + dx
-                    params.y = lastParamY + dy
-                    windowManager.updateViewLayout(view, params)
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (!moved) {
-                        toggleFromBubble()
+                    if (kotlin.math.abs(dx) > 8 || kotlin.math.abs(dy) > 8) {
+                        moved = true
+                        params.x = lastParamX + dx
+                        params.y = lastParamY + dy
+                        windowManager.updateViewLayout(view, params)
+                        updateBubbleBounds(view, params)
                     }
-                    true
+                    moved
                 }
                 else -> false
             }
         }
 
-        windowManager.addView(view, params)
+        val btnMain = view.findViewById<View>(R.id.btnBubbleMain)
+        val btnClose = view.findViewById<View>(R.id.btnBubbleClose)
+        val btnSettings = view.findViewById<View>(R.id.btnBubbleSettings)
+
+        applyCustomization(btnMain)
+
+        btnMain.setOnClickListener { toggleFromBubble() }
+
+        btnClose.setOnClickListener {
+            // Close ALWAYS stops tapping and fully removes the overlay + service.
+            stopAllTapping()
+            removeBubble()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+
+        btnSettings.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            startActivity(intent)
+        }
+
+        try {
+            windowManager.addView(view, params)
+            Log.d("AutoTapperDebug", "bubble addView SUCCESS")
+        } catch (e: Exception) {
+            Log.e("AutoTapperDebug", "bubble addView FAILED: ${e.javaClass.simpleName}: ${e.message}", e)
+        }
         updateBubbleIcon()
     }
 
+    private fun updateBubbleBounds(view: View, params: WindowManager.LayoutParams) {
+        // Approximate bounds in screen coordinates; good enough for the safe-zone check.
+        bubbleLeft = params.x
+        bubbleTop = params.y
+        bubbleRight = params.x + 160 // combined width of close+main+settings row
+        bubbleBottom = params.y + 60
+        // Also tell the accessibility service so its own exclusion-radius check
+        // (a second, independent layer of the same safety net) stays in sync.
+        TapAccessibilityService.instance?.updateBubblePosition(
+            bubbleLeft + (bubbleRight - bubbleLeft) / 2,
+            bubbleTop + (bubbleBottom - bubbleTop) / 2
+        )
+    }
+
+    private fun removeBubble() {
+        bubbleView?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
+        }
+        bubbleView = null
+    }
+
+    private fun applyCustomization(mainButtonView: View) {
+        val color = Preferences.getBubbleColor(this)
+        val sizeDp = Preferences.getBubbleSizeDp(this)
+        val sizePx = (sizeDp * resources.displayMetrics.density).toInt()
+
+        // mainButtonView is the FrameLayout; its first child is the colored circle View.
+        if (mainButtonView is android.view.ViewGroup && mainButtonView.childCount > 0) {
+            val circle = mainButtonView.getChildAt(0)
+            val bg = circle.background?.mutate()
+            if (bg is android.graphics.drawable.GradientDrawable) {
+                bg.setColor(color)
+            }
+            circle.layoutParams = circle.layoutParams.apply {
+                width = sizePx
+                height = sizePx
+            }
+            mainButtonView.layoutParams = mainButtonView.layoutParams.apply {
+                width = sizePx
+                height = sizePx
+            }
+        }
+    }
+
+    private fun maybeVibrate() {
+        if (!Preferences.isVibrateEnabled(this)) return
+        val vibrator = getSystemService(android.os.Vibrator::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(android.os.VibrationEffect.createOneShot(20, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(20)
+        }
+    }
+
     private fun toggleFromBubble() {
+        maybeVibrate()
         if (isRunning) {
-            TapAccessibilityService.instance?.stopTapping()
-            isRunning = false
+            stopAllTapping()
         } else {
             TapAccessibilityService.instance?.let {
                 isRunning = true
             }
+            updateBubbleIcon()
         }
-        updateBubbleIcon()
     }
 
     private fun updateBubbleIcon() {
@@ -168,7 +304,7 @@ class OverlayService : Service() {
         var lastParamX = 0
         var lastParamY = 0
 
-        view.setOnTouchListener { v, event ->
+        view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     lastTouchX = event.rawX
@@ -233,28 +369,38 @@ class OverlayService : Service() {
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("AutoTapper")
-            .setContentText("Overlay controls active")
+            .setContentText("Tap the bubble's X to stop and close")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(1, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(1, notification)
+            }
+        } catch (e: Exception) {
+            Log.e("AutoTapperDebug", "startForeground FAILED: ${e.javaClass.simpleName}: ${e.message}", e)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        bubbleView?.let { windowManager.removeView(it) }
-        crosshairView?.let { windowManager.removeView(it) }
+        StatsStore.recordSessionEnd(this)
+        TapAccessibilityService.instance?.stopTapping()
+        TapAccessibilityService.instance?.updateBubblePosition(null, null)
+        instanceRef = null
+        removeBubble()
+        crosshairView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        var instanceRef: OverlayService? = null
+
         const val ACTION_START = "com.clicker.auto.START"
         const val ACTION_STOP = "com.clicker.auto.STOP"
         const val ACTION_PICK_POINT = "com.clicker.auto.PICK_POINT"
