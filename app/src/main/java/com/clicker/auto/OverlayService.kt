@@ -39,7 +39,6 @@ class OverlayService : Service() {
         Log.d("AutoTapperDebug", "OverlayService onCreate() called")
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForegroundNotification()
-<<<<<<< HEAD
         StatsStore.recordSessionStart(this)
         instanceRef = this
     }
@@ -48,9 +47,6 @@ class OverlayService : Service() {
     fun onSafetyStop() {
         isRunning = false
         updateBubbleIcon()
-=======
-        Log.d("AutoTapperDebug", "OverlayService foreground notification started")
->>>>>>> 7302e44bd839687290440e53302d44dc5a6855df
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -130,7 +126,6 @@ class OverlayService : Service() {
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.overlay_bubble, null)
         bubbleView = view
-        Log.d("AutoTapperDebug", "bubble view inflated successfully")
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -179,7 +174,6 @@ class OverlayService : Service() {
             }
         }
 
-<<<<<<< HEAD
         val btnMain = view.findViewById<View>(R.id.btnBubbleMain)
         val btnClose = view.findViewById<View>(R.id.btnBubbleClose)
         val btnSettings = view.findViewById<View>(R.id.btnBubbleSettings)
@@ -202,8 +196,6 @@ class OverlayService : Service() {
             startActivity(intent)
         }
 
-=======
->>>>>>> 7302e44bd839687290440e53302d44dc5a6855df
         try {
             windowManager.addView(view, params)
             Log.d("AutoTapperDebug", "bubble addView SUCCESS")
@@ -389,10 +381,6 @@ class OverlayService : Service() {
             } else {
                 startForeground(1, notification)
             }
-<<<<<<< HEAD
-=======
-            Log.d("AutoTapperDebug", "startForeground SUCCESS")
->>>>>>> 7302e44bd839687290440e53302d44dc5a6855df
         } catch (e: Exception) {
             Log.e("AutoTapperDebug", "startForeground FAILED: ${e.javaClass.simpleName}: ${e.message}", e)
         }
